@@ -136,144 +136,104 @@
             appId: "1:638697811438:web:fe1625e5a21f3701bf72ff"
         };
 
-        console.log("Inicializácia Firebase...");
+        // Inicializácia Firebase
         const app = initializeApp(firebaseConfig);
-        console.log("Firebase inicializované:", app);
-
         const auth = getAuth(app);
-        const storage = getStorage(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
 
-        signInAnonymously(auth).then(() => {
-            console.log("Anonymné prihlásenie úspešné");
-        }).catch(error => {
-            console.error("Anonymous sign-in error:", error);
-        });
+        // Anonymné prihlásenie
+        signInAnonymously(auth)
+            .then(() => console.log("Prihlásený anonymne"))
+            .catch(error => console.error("Chyba prihlásenia:", error));
 
-        const fileNames = {};
-
+        // Hlavné funkcie
         function uploadFile(personId, column, file) {
-            console.log("Spúšťam uploadFile pre personId:", personId, "súbor:", file.name);
-            
-            const storagePath = `uploads/${personId}/file${column}/${file.name}`;
-            console.log("Cesta v Storage:", storagePath);
-            
-            const storageRef = ref(storage, storagePath);
+            const storageRef = ref(storage, `submissions/${personId}/${file.name}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
 
             uploadTask.on('state_changed',
-                snapshot => {
+                (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    console.log(`Postup nahrávania: ${progress.toFixed(2)}%`);
                     document.getElementById(`progress_${personId}_${column}`).style.width = progress + '%';
                 },
-                error => {
-                    console.error('Chyba pri nahrávaní:', error);
-                    alert('Chyba pri nahrávaní súboru: ' + error.message);
+                (error) => {
+                    console.error("Chyba nahrávania:", error);
+                    alert("Chyba pri nahrávaní súboru: " + error.message);
                 },
                 () => {
-                    console.log("Nahrávanie dokončené, získavam download URL...");
-                    getDownloadURL(uploadTask.snapshot.ref).then(downloadURL => {
-                        console.log("Download URL:", downloadURL);
+                    getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+                        // Uloženie URL do Firestore
+                        setDoc(doc(db, "submissions", `person_${personId}`), {
+                            fileUrl: downloadURL,
+                            fileName: file.name,
+                            timestamp: new Date()
+                        }, { merge: true });
                         
-                        setDoc(doc(db, "files", `file_${personId}_${column}`), {
-                            url: downloadURL,
-                            fileName: file.name
-                        }).then(() => {
-                            console.log("Dokument uložený v Firestore");
-                            document.getElementById(`fileUrl_${personId}_${column}`).innerHTML =
-                                `<a href="${downloadURL}" target="_blank">Súbor úspešne nahratý.</a>`;
-                        });
-
-                        if (!fileNames[personId]) fileNames[personId] = {};
-                        fileNames[personId][column] = file.name;
-                        localStorage.setItem('fileNames', JSON.stringify(fileNames));
+                        // Zobrazenie odkazu
+                        document.getElementById(`fileUrl_${personId}_${column}`).innerHTML = 
+                            `<a href="${downloadURL}" target="_blank">${file.name}</a>`;
                     });
                 }
             );
         }
 
         function removeFile(personId, column) {
-            console.log("Odstraňujem súbor pre personId:", personId, "stĺpec:", column);
+            const fileUrlElement = document.getElementById(`fileUrl_${personId}_${column}`);
+            const fileName = fileUrlElement.textContent;
             
-            const fileName = fileNames[personId]?.[column];
-            if (!fileName) {
-                console.log("Žiadny súbor na odstránenie");
-                return;
+            if (fileName) {
+                const storageRef = ref(storage, `submissions/${personId}/${fileName}`);
+                
+                deleteObject(storageRef)
+                    .then(() => {
+                        // Odstránenie záznamu z Firestore
+                        setDoc(doc(db, "submissions", `person_${personId}`), {
+                            fileUrl: "",
+                            fileName: ""
+                        }, { merge: true });
+                        
+                        // Reset UI
+                        fileUrlElement.innerHTML = "";
+                        document.getElementById(`progress_${personId}_${column}`).style.width = "0%";
+                    })
+                    .catch(error => {
+                        console.error("Chyba mazania:", error);
+                        alert("Chyba pri odstraňovaní súboru");
+                    });
             }
-
-            const fileRef = ref(storage, `uploads/${personId}/file${column}/${fileName}`);
-            deleteObject(fileRef).then(() => {
-                console.log("Súbor úspešne odstránený z Storage");
-                document.getElementById(`fileUrl_${personId}_${column}`).innerHTML = '';
-                setDoc(doc(db, "files", `file_${personId}_${column}`), { url: "", fileName: "" });
-                delete fileNames[personId][column];
-                localStorage.setItem('fileNames', JSON.stringify(fileNames));
-            }).catch(error => {
-                console.error('Chyba pri odstraňovaní súboru:', error);
-            });
         }
 
+        // YouTube link funkcie
         function saveYouTubeLink(personId) {
-            const youtubeLink = document.getElementById(`youtubeLinkInput_${personId}`).value.trim();
-            console.log("Ukladám YouTube link pre personId:", personId, "link:", youtubeLink);
-            
-            if (!youtubeLink) {
-                alert('Prosím vložte YouTube odkaz');
+            const link = document.getElementById(`youtubeLinkInput_${personId}`).value.trim();
+            if (!link) {
+                alert("Prosím vložte YouTube odkaz");
                 return;
-            }
-
-            let displayUrl = youtubeLink;
-            if (youtubeLink.includes('youtube.com/watch?v=')) {
-                const videoId = youtubeLink.split('v=')[1].split('&')[0];
-                displayUrl = `https://www.youtube.com/watch?v=${videoId}`;
             }
 
             setDoc(doc(db, "youtubeLinks", `person_${personId}`), {
-                link: youtubeLink,
-                displayUrl,
-                personId
+                link: link,
+                timestamp: new Date()
             }, { merge: true }).then(() => {
-                console.log("YouTube link uložený");
-                document.getElementById(`youtubeLinkDisplay_${personId}`).innerHTML =
-                    `<a href="${displayUrl}" target="_blank">${displayUrl}</a>`;
-                alert('YouTube odkaz uložený!');
+                document.getElementById(`youtubeLinkDisplay_${personId}`).innerHTML = 
+                    `<a href="${link}" target="_blank">${link}</a>`;
+                alert("YouTube odkaz uložený!");
             });
         }
 
         function removeYouTubeLink(personId) {
-            console.log("Odstraňujem YouTube link pre personId:", personId);
-            
-            const youtubeLinkRef = doc(db, "youtubeLinks", `person_${personId}`);
-            deleteDoc(youtubeLinkRef).then(() => {
-                console.log("YouTube link odstránený");
-                document.getElementById(`youtubeLinkInput_${personId}`).value = '';
-                document.getElementById(`youtubeLinkDisplay_${personId}`).innerHTML = '';
-                alert('YouTube odkaz odstránený!');
+            setDoc(doc(db, "youtubeLinks", `person_${personId}`), {
+                link: ""
+            }, { merge: true }).then(() => {
+                document.getElementById(`youtubeLinkInput_${personId}`).value = "";
+                document.getElementById(`youtubeLinkDisplay_${personId}`).innerHTML = "";
+                alert("YouTube odkaz odstránený!");
             });
         }
 
-        async function loadYouTubeLinks() {
-            console.log("Načítavam YouTube linky...");
-            
-            for (let i = 1; i <= 21; i++) {
-                const docRef = doc(db, "youtubeLinks", `person_${i}`);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    console.log("Našiel som uložený link pre personId:", i, "link:", data.link);
-                    
-                    document.getElementById(`youtubeLinkInput_${i}`).value = data.link;
-                    document.getElementById(`youtubeLinkDisplay_${i}`).innerHTML =
-                        `<a href="${data.displayUrl || data.link}" target="_blank">${data.displayUrl || data.link}</a>`;
-                }
-            }
-        }
-
-        window.onload = () => {
-            console.log("Stránka načítaná, inicializácia...");
-            
-            const savedFileNames = JSON.parse(localStorage.getItem('fileNames')) || {};
+        // Načítanie existujúcich dát
+        async function loadData() {
             const personNames = [
                 "Sofia M.", "Lukáš M.", "Martina M.", "Bence N.", "Evelyn N.", "Fanni N.", "Sophia N.",
                 "Veronika N.", "Lea N.", "Valentína O.", "Alexandra P.", "Soňa P.", "Filip P.", "Vasylyna P.",
@@ -281,49 +241,47 @@
             ];
 
             for (let i = 1; i <= 21; i++) {
-                const personId = i;
-                document.getElementById(`personName_${personId}`).innerText = personNames[i - 1];
+                // Nastav mená
+                document.getElementById(`personName_${i}`).textContent = personNames[i-1];
 
-                const fileInput = document.getElementById(`fileInput_${personId}_1`);
-                fileInput.addEventListener('change', (e) => {
-                    console.log("Súbor vybraný:", e.target.files[0]);
-                    const file = e.target.files[0];
-                    if (file) uploadFile(personId, 1, file);
+                // Pridaj event listenery pre súbory
+                document.getElementById(`fileInput_${i}_1`).addEventListener('change', (e) => {
+                    if (e.target.files[0]) uploadFile(i, 1, e.target.files[0]);
                 });
 
-                document.getElementById(`removeFile_${personId}_1`).addEventListener('click', () => {
-                    removeFile(personId, 1);
+                document.getElementById(`removeFile_${i}_1`).addEventListener('click', () => {
+                    removeFile(i, 1);
                 });
 
-                document.getElementById(`saveYouTubeLink_${personId}`).addEventListener('click', () => {
-                    saveYouTubeLink(personId);
+                // Pridaj event listenery pre YouTube
+                document.getElementById(`saveYouTubeLink_${i}`).addEventListener('click', () => {
+                    saveYouTubeLink(i);
                 });
 
-                document.getElementById(`removeYouTubeLink_${personId}`).addEventListener('click', () => {
-                    removeYouTubeLink(personId);
+                document.getElementById(`removeYouTubeLink_${i}`).addEventListener('click', () => {
+                    removeYouTubeLink(i);
                 });
 
-                const fileRef = doc(db, "files", `file_${personId}_1`);
-                getDoc(fileRef).then(docSnap => {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        console.log("Našiel som súbor pre personId:", personId, "data:", data);
-                        
-                        if (data.url) {
-                            document.getElementById(`fileUrl_${personId}_1`).innerHTML =
-                                `<a href="${data.url}" target="_blank">Kliknite pre zobrazenie súboru</a>`;
-                        }
-                        if (!fileNames[personId]) fileNames[personId] = {};
-                        fileNames[personId][1] = data.fileName;
-                        savedFileNames[personId] = savedFileNames[personId] || {};
-                        savedFileNames[personId][1] = data.fileName;
-                        localStorage.setItem('fileNames', JSON.stringify(savedFileNames));
-                    }
-                });
+                // Načítaj existujúce dáta
+                const submissionDoc = await getDoc(doc(db, "submissions", `person_${i}`));
+                if (submissionDoc.exists() && submissionDoc.data().fileUrl) {
+                    document.getElementById(`fileUrl_${i}_1`).innerHTML = 
+                        `<a href="${submissionDoc.data().fileUrl}" target="_blank">${submissionDoc.data().fileName}</a>`;
+                }
+
+                const youtubeDoc = await getDoc(doc(db, "youtubeLinks", `person_${i}`));
+                if (youtubeDoc.exists() && youtubeDoc.data().link) {
+                    document.getElementById(`youtubeLinkInput_${i}`).value = youtubeDoc.data().link;
+                    document.getElementById(`youtubeLinkDisplay_${i}`).innerHTML = 
+                        `<a href="${youtubeDoc.data().link}" target="_blank">${youtubeDoc.data().link}</a>`;
+                }
             }
+        }
 
-            loadYouTubeLinks();
-        };
+        // Spustenie po načítaní stránky
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData();
+        });
     </script>
 </body>
 </html>
