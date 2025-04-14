@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nahrávanie súborov</title>
+
+    <script type="module">
+        // Firebase imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.8.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.8.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.8.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.8.1/firebase-storage.js";
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDeR53hgZuwcQUBtlflIiicP-mUth-meBA",
+            authDomain: "zaverecna-praca-6ff35.firebaseapp.com",
+            projectId: "zaverecna-praca-6ff35",
+            storageBucket: "zaverecna-praca-6ff35.appspot.com",
+            messagingSenderId: "638697811438",
+            appId: "1:638697811438:web:fe1625e5a21f3701bf72ff"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const storage = getStorage(app);
+        const db = getFirestore(app);
+
+        // Sign in anonymously
+        signInAnonymously(auth).catch((error) => {
+            console.error("Error signing in anonymously:", error);
+        });
+
+        // Store file names in memory or localStorage
+        const fileNames = {};
+
+        // Function to handle file upload
+        function uploadFile(personId, column, file) {
+            const storageRef = ref(storage, `uploads/${personId}/file${column}/${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed',
+                function(snapshot) {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    document.getElementById(`progress_${personId}_${column}`).style.width = progress + '%';
+                },
+                function(error) {
+                    console.error('Error uploading file:', error);
+                    alert('Error uploading file');
+                },
+                function() {
+                    getDownloadURL(uploadTask.snapshot.ref).then(function(downloadURL) {
+                        setDoc(doc(db, "files", `file_${personId}_${column}`), { 
+                            url: downloadURL,
+                            fileName: file.name // Store the file name
+                        })
+                        .then(() => {
+                            document.getElementById(`fileUrl_${personId}_${column}`).innerHTML = 
+                                `<a href="${downloadURL}" target="_blank">Súbor úspešne nahratý.</a>`;
+                        }).catch(error => {
+                            console.error('Error saving file URL in Firestore:', error);
+                        });
+
+                        // Store the file name in memory
+                        if (!fileNames[personId]) fileNames[personId] = {};
+                        fileNames[personId][column] = file.name;
+
+                        // Optionally, save the file names in localStorage for persistence across page refreshes
+                        localStorage.setItem('fileNames', JSON.stringify(fileNames));
+                    });
+                }
+            );
+        }
+
+        // Function to handle file removal
+        function removeFile(personId, column) {
+            const fileName = fileNames[personId]?.[column];
+            if (!fileName) {
+                console.error('No file selected to remove');
+                alert('No file selected to remove');
+                return;
+            }
+
+            const fileRef = ref(storage, `uploads/${personId}/file${column}/${fileName}`);
+            deleteObject(fileRef).then(() => {
+                document.getElementById(`fileUrl_${personId}_${column}`).innerHTML = '';
+                setDoc(doc(db, "files", `file_${personId}_${column}`), { url: "", fileName: "" })
+                    .catch(error => {
+                        console.error('Error removing file URL in Firestore:', error);
+                    });
+                delete fileNames[personId][column];
+                localStorage.setItem('fileNames', JSON.stringify(fileNames));
+            }).catch(error => {
+                console.error('Error removing file:', error);
+                alert('Error removing file');
+            });
+        }
+
+        // Function to handle saving YouTube link
+        function saveYouTubeLink(personId) {
+            const youtubeLink = document.getElementById(`youtubeLink_${personId}`).value;
+            if (youtubeLink) {
+                setDoc(doc(db, "youtubeLinks", `youtubeLink_${personId}`), { link: youtubeLink })
+                    .then(() => {
+                        alert('YouTube link saved!');
+                    }).catch(error => {
+                        console.error('Error saving YouTube link:', error);
+                    });
+            } else {
+                alert('Please enter a YouTube link');
+            }
+        }
+
+        // Function to remove YouTube link
+        function removeYouTubeLink(personId) {
+            const youtubeLinkRef = doc(db, "youtubeLinks", `youtubeLink_${personId}`);
+            deleteDoc(youtubeLinkRef)
+                .then(() => {
+                    document.getElementById(`youtubeLink_${personId}`).value = '';  // Clear input field
+                    alert('YouTube link removed!');
+                }).catch(error => {
+                    console.error('Error removing YouTube link:', error);
+                    alert('Error removing YouTube link');
+                });
+        }
+
+        // Function to populate saved data on page load
+        window.onload = function() {
+            const savedFileNames = JSON.parse(localStorage.getItem('fileNames')) || {};
+            const personNames = [
+                "Sofia M.", "Lukáš M.", "Martina M.", "Bence N.", "Evelyn N.", "Fanni N.", "Sophia N.",
+                "Veronika N.", "Lea N.", "Valentína O.", "Alexandra P.", "Soňa P.", "Filip P.", "Vasylyna P.",
+                "Katarína P.", "Kristína S.", "Natália S.", "Ema S.", "Nikola S.", "Daniela S.", 
+                "Claudia S.", "------"
+            ];
+
+            for (let i = 0; i < 21; i++) {
+                const personId = i + 1;
+                for (let j = 1; j <= 3; j++) {
+                    const fileRef = doc(db, "files", `file_${personId}_${j}`);
+                    getDoc(fileRef).then(docSnapshot => {
+                        if (docSnapshot.exists()) {
+                            const fileUrl = docSnapshot.data().url;
+                            const fileName = docSnapshot.data().fileName;
+                            if (fileUrl) {
+                                document.getElementById(`fileUrl_${personId}_${j}`).innerHTML = 
+                                    `<a href="${fileUrl}" target="_blank">Kliknite pre zobrazenie súboru.</a>`;
+                            }
+
+                            if (!fileNames[personId]) fileNames[personId] = {};
+                            fileNames[personId][j] = fileName;
+
+                            savedFileNames[personId] = savedFileNames[personId] || {};
+                            savedFileNames[personId][j] = fileName;
+                            localStorage.setItem('fileNames', JSON.stringify(savedFileNames));
+                        }
+                    });
+
+                    const inputElement = document.getElementById(`fileInput_${personId}_${j}`);
+                    inputElement.addEventListener('change', function(event) {
+                        const file = event.target.files[0];
+                        if (file) {
+                            uploadFile(personId, j, file);
+                        }
+                    });
+
+                    const removeButton = document.getElementById(`removeFile_${personId}_${j}`);
+                    removeButton.addEventListener('click', function() {
+                        removeFile(personId, j);
+                    });
+                }
+
+                const youtubeLinkButton = document.getElementById(`saveYouTubeLink_${personId}`);
+                youtubeLinkButton.addEventListener('click', function() {
+                    saveYouTubeLink(personId);
+                });
+
+                const youtubeLinkRef = doc(db, "youtubeLinks", `youtubeLink_${personId}`);
+                getDoc(youtubeLinkRef).then(docSnapshot => {
+                    if (docSnapshot.exists()) {
+                        const youtubeLink = docSnapshot.data().link;
+                        if (youtubeLink) {
+                            document.getElementById(`youtubeLink_${personId}`).value = youtubeLink;
+                        }
+                    }
+                });
+
+                const removeYoutubeLinkButton = document.getElementById(`removeYouTubeLink_${personId}`);
+                removeYoutubeLinkButton.addEventListener('click', function() {
+                    removeYouTubeLink(personId);
+                });
+
+                // Set the name of the person dynamically
+                document.getElementById(`personName_${personId}`).innerText = personNames[i];
+            }
+
+            // Apply the blue background to the first row after it is populated
+            document.querySelector("tr:nth-child(1)").style.backgroundColor = '#007bff';
+            document.querySelector("tr:nth-child(1)").style.color = 'white';
+        };
+    </script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        table {
+            width: 80%;
+            margin: 0 auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f3f3f3;
+            margin-top: 5px;
+            border-radius: 5px;
+        }
+        .progress {
+            height: 100%;
+            background-color: #4caf50;
+            width: 0%;
+            border-radius: 5px;
+        }
+        button {
+            padding: 5px 10px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        input[type="text"] {
+            width: 90%;
+            padding: 5px;
+        }
+        footer {
+            margin-top: 50px;
+            padding: 10px;
+            font-size: 14px;
+            color: #555;
+            background-color: #f4f4f4;
+        }
+        .image-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .image-container img {
+            height: 100px;
+            object-fit: contain;
+        }
+
+        /* New CSS for alternating row colors */
+        tr:nth-child(even) {
+            background-color: #f2f2f2; /* Gray background for even rows */
+        }
+        tr:nth-child(odd) {
+            background-color: white; /* White background for odd rows */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="image-container">
+        <img src="obrazky/EUBA LOGO.jpg" alt="Logo EUBA">
+        <img src="obrazky/FHI LOGO.jpg" alt="Logo FHI">
+    </div>
+    
+    <h1>Tabuľka pre nahrávanie súborov</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Meno</th>
+                <th>Technické a programové vybavenie počítača</th>
+                <th>Dobrovoľná práca</th>
+                <th>Záverečná práca</th>
+                <th>Youtube link</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Loop through 21 people -->
+            <script>
+                for (let i = 1; i <= 21; i++) {
+                    document.write(`
+                        <tr>
+                            <td id="personName_${i}">Person ${i}</td>
+                            <td>
+                                <button onclick="document.getElementById('fileInput_${i}_1').click();">Nahrať súbor 1</button>
+                                <input type="file" id="fileInput_${i}_1">
+                                <div class="progress-bar">
+                                    <div class="progress" id="progress_${i}_1"></div>
+                                </div>
+                                <div id="fileUrl_${i}_1"></div>
+                                <button id="removeFile_${i}_1">Odstrániť súbor</button>
+                            </td>
+                            <td>
+                                <button onclick="document.getElementById('fileInput_${i}_2').click();">Nahrať súbor 2</button>
+                                <input type="file" id="fileInput_${i}_2">
+                                <div class="progress-bar">
+                                    <div class="progress" id="progress_${i}_2"></div>
+                                </div>
+                                <div id="fileUrl_${i}_2"></div>
+                                <button id="removeFile_${i}_2">Odstrániť súbor</button>
+                            </td>
+                            <td>
+                                <button onclick="document.getElementById('fileInput_${i}_3').click();">Nahrať súbor 3</button>
+                                <input type="file" id="fileInput_${i}_3">
+                                <div class="progress-bar">
+                                    <div class="progress" id="progress_${i}_3"></div>
+                                </div>
+                                <div id="fileUrl_${i}_3"></div>
+                                <button id="removeFile_${i}_3">Odstrániť súbor</button>
+                            </td>
+                            <td>
+                                <input type="text" id="youtubeLink_${i}" placeholder="Vložte Youtube link">
+                                <button id="saveYouTubeLink_${i}">Uložiť link</button>
+                                <button id="removeYouTubeLink_${i}">Odstrániť link</button>
+                            </td>
+                        </tr>
+                    `);
+                }
+            </script>
+        </tbody>
+    </table>
+    <footer>
+        <p>Vytvoril: Lukáš Miščík</p>
+        <p>Vyučujúci: doc. Ing. Jaroslav Kultan, PhD.</p>
+    </footer>
+
+</body>
+</html>
