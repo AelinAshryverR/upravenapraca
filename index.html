@@ -79,7 +79,7 @@
     <!-- Skript na vygenerovanie tabuľky -->
     <script>
         const tbody = document.getElementById('tableBody');
-        for (let i = 1; i <= 25; i++) {
+        for (let i = 1; i <= 24; i++) {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td id="personName_${i}">Person ${i}</td>
@@ -153,7 +153,7 @@
         }
 
         async function loadYouTubeLinks() {
-            for (let i = 1; i <= 21; i++) {
+            for (let i = 1; i <= 24; i++) {
                 const docRef = doc(db, "youtubeLinks", `person_${i}`);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists() && docSnap.data().link) {
@@ -166,15 +166,33 @@
 
         window.onload = () => {
             const personNames = [
-         const personNames = [
-    "Ako natočiť video?", "Ako nahrať video na youtube?", "Bielková N.", "Hanáková K.", "Evelyn N.", "Hanzelová P.", "Hanková L.",
-    "Gdúlová J.", "Dobiašová A.", "Frajkorová S.", "Fritschová T.", "Gajdoš M.", "Guttenová T.", "Hrebíček M",
-    "Hricko M.", "Hričovská M.", "Hrnčiar M.", "Hvizdošová E.", "Chlpíková D.", "Chudá M.", "Ihnátová T.", "Ilková K.", "Ivšaková K.", "Janovcová N."
-];
-   
+                "Ako natočiť video?", 
+                "Ako nahrať video na youtube?", 
+                "Bielková N.", 
+                "Hanáková K.", 
+                "Evelyn N.", 
+                "Hanzelová P.", 
+                "Hanková L.",
+                "Gdúlová J.", 
+                "Dobiašová A.", 
+                "Frajkorová S.", 
+                "Fritschová T.", 
+                "Gajdoš M.", 
+                "Guttenová T.", 
+                "Hrebíček M",
+                "Hricko M.", 
+                "Hričovská M.", 
+                "Hrnčiar M.", 
+                "Hvizdošová E.", 
+                "Chlpíková D.", 
+                "Chudá M.", 
+                "Ihnátová T.", 
+                "Ilková K.", 
+                "Ivšaková K.", 
+                "Janovcová N."
             ];
 
-            for (let i = 1; i <= 21; i++) {
+            for (let i = 1; i <= 24; i++) {
                 document.getElementById(`personName_${i}`).innerText = personNames[i - 1];
 
                 document.getElementById(`saveYouTubeLink_${i}`).addEventListener('click', () => {
