@@ -86,6 +86,17 @@
             font-size: 12px;
             color: #555;
         }
+        .status-message {
+            margin-top: 5px;
+            font-size: 12px;
+            min-height: 20px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
     </style>
 </head>
 <body>
@@ -110,7 +121,6 @@
         <p>Vyučujúci: doc. Ing. Jaroslav Kultan, PhD.</p>
     </footer>
 
-    <!-- Skript na vygenerovanie tabuľky -->
     <script>
         const tbody = document.getElementById('tableBody');
         const personNames = [
@@ -130,11 +140,13 @@
                         <div class="progress" id="progress_${i}_1"></div>
                     </div>
                     <div id="fileUrl_${i}_1" class="file-info"></div>
+                    <div id="uploadStatus_${i}_1" class="status-message"></div>
                     <button id="removeFile_${i}_1" disabled>Odstrániť súbor</button>
                 </td>
                 <td>
                     <input type="text" id="youtubeLinkInput_${i}" placeholder="Vložte YouTube link">
                     <div class="youtube-link-display" id="youtubeLinkDisplay_${i}"></div>
+                    <div id="youtubeStatus_${i}" class="status-message"></div>
                     <button id="saveYouTubeLink_${i}">Uložiť link</button>
                     <button id="removeYouTubeLink_${i}" disabled>Odstrániť link</button>
                 </td>
@@ -143,11 +155,10 @@
         }
     </script>
 
-    <!-- Firebase a logika -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.8.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.8.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.8.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.8.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.8.1/firebase-storage.js";
 
         // Firebase konfigurácia
@@ -183,9 +194,9 @@
             // Funkcia pre nahrávanie súboru
             window.uploadFile = function(personId, column, file) {
                 console.log(`Starting upload for person ${personId}, file: ${file.name}`);
-                
-                // Zablokovanie tlačidla počas nahrávania
-                document.getElementById(`fileInput_${personId}_${column}`).disabled = true;
+                const statusElement = document.getElementById(`uploadStatus_${personId}_${column}`);
+                statusElement.textContent = "Začínam nahrávanie...";
+                statusElement.className = "status-message";
                 
                 const storageRef = ref(storage, `uploads/person_${personId}/file_${column}/${file.name}`);
                 const uploadTask = uploadBytesResumable(storageRef, file);
@@ -195,14 +206,17 @@
                         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                         console.log(`Upload progress: ${progress}%`);
                         document.getElementById(`progress_${personId}_${column}`).style.width = progress + '%';
+                        statusElement.textContent = `Nahrávanie: ${Math.round(progress)}%`;
                     },
                     (error) => {
                         console.error('Upload error:', error);
-                        alert(`Chyba pri nahrávaní: ${error.message}`);
-                        document.getElementById(`fileInput_${personId}_${column}`).disabled = false;
+                        statusElement.textContent = "Chyba pri nahrávaní: " + error.message;
+                        statusElement.className = "status-message error";
                     },
                     () => {
                         console.log('Upload complete, getting download URL');
+                        statusElement.textContent = "Preberám URL...";
+                        
                         getDownloadURL(uploadTask.snapshot.ref)
                             .then((downloadURL) => {
                                 console.log('Download URL:', downloadURL);
@@ -214,18 +228,19 @@
                             })
                             .then(() => {
                                 console.log('File metadata saved to Firestore');
+                                statusElement.textContent = "Nahrávanie úspešné!";
+                                statusElement.className = "status-message success";
+                                
                                 document.getElementById(`fileUrl_${personId}_${column}`).innerHTML = `
                                     <a href="${downloadURL}" target="_blank">${file.name}</a>
                                     <div>Veľkosť: ${formatFileSize(file.size)}</div>
                                 `;
                                 document.getElementById(`removeFile_${personId}_${column}`).disabled = false;
-                                document.getElementById(`fileInput_${personId}_${column}`).disabled = false;
-                                alert('Súbor bol úspešne nahratý!');
                             })
                             .catch((error) => {
-                                console.error('Error saving metadata:', error);
-                                alert(`Chyba pri ukladaní metadát: ${error.message}`);
-                                document.getElementById(`fileInput_${personId}_${column}`).disabled = false;
+                                console.error('Error after upload:', error);
+                                statusElement.textContent = "Chyba po nahrávaní: " + error.message;
+                                statusElement.className = "status-message error";
                             });
                     }
                 );
@@ -234,6 +249,10 @@
             // Funkcia pre odstránenie súboru
             window.removeFile = function(personId, column) {
                 if (!confirm('Naozaj chcete odstrániť tento súbor?')) return;
+                
+                const statusElement = document.getElementById(`uploadStatus_${personId}_${column}`);
+                statusElement.textContent = "Odstraňujem súbor...";
+                statusElement.className = "status-message";
                 
                 const fileRef = doc(db, "files", `file_${personId}_${column}`);
                 getDoc(fileRef)
@@ -248,7 +267,8 @@
                                         document.getElementById(`fileUrl_${personId}_${column}`).innerHTML = '';
                                         document.getElementById(`progress_${personId}_${column}`).style.width = '0%';
                                         document.getElementById(`removeFile_${personId}_${column}`).disabled = true;
-                                        alert('Súbor bol odstránený');
+                                        statusElement.textContent = "Súbor bol odstránený";
+                                        statusElement.className = "status-message success";
                                     });
                             }
                         }
@@ -256,15 +276,19 @@
                     })
                     .catch((error) => {
                         console.error('Delete error:', error);
-                        alert(`Chyba pri odstraňovaní: ${error.message}`);
+                        statusElement.textContent = "Chyba pri odstraňovaní: " + error.message;
+                        statusElement.className = "status-message error";
                     });
             };
 
             // Funkcia pre uloženie YouTube linku
             window.saveYouTubeLink = function(personId) {
                 const youtubeLink = document.getElementById(`youtubeLinkInput_${personId}`).value.trim();
+                const statusElement = document.getElementById(`youtubeStatus_${personId}`);
+                
                 if (!youtubeLink) {
-                    alert('Prosím vložte YouTube odkaz');
+                    statusElement.textContent = "Prosím vložte YouTube odkaz";
+                    statusElement.className = "status-message error";
                     return;
                 }
 
@@ -275,9 +299,13 @@
                 } else if (youtubeLink.includes('youtu.be/')) {
                     videoId = youtubeLink.split('youtu.be/')[1].split('?')[0];
                 } else {
-                    alert('Neplatný YouTube odkaz');
+                    statusElement.textContent = "Neplatný YouTube odkaz";
+                    statusElement.className = "status-message error";
                     return;
                 }
+
+                statusElement.textContent = "Ukladám odkaz...";
+                statusElement.className = "status-message";
 
                 const embedUrl = `https://www.youtube.com/embed/${videoId}`;
                 const displayUrl = `https://www.youtube.com/watch?v=${videoId}`;
@@ -291,14 +319,15 @@
                 .then(() => {
                     document.getElementById(`youtubeLinkDisplay_${personId}`).innerHTML = `
                         <a href="${displayUrl}" target="_blank">${displayUrl}</a>
-                        <div><small>(Kliknite pre zobrazenie videa)</small></div>
                     `;
                     document.getElementById(`removeYouTubeLink_${personId}`).disabled = false;
-                    alert('YouTube odkaz bol uložený!');
+                    statusElement.textContent = "Odkaz uložený!";
+                    statusElement.className = "status-message success";
                 })
                 .catch((error) => {
                     console.error('Error saving YouTube link:', error);
-                    alert(`Chyba pri ukladaní: ${error.message}`);
+                    statusElement.textContent = "Chyba pri ukladaní: " + error.message;
+                    statusElement.className = "status-message error";
                 });
             };
 
@@ -306,17 +335,23 @@
             window.removeYouTubeLink = function(personId) {
                 if (!confirm('Naozaj chcete odstrániť tento YouTube odkaz?')) return;
                 
+                const statusElement = document.getElementById(`youtubeStatus_${personId}`);
+                statusElement.textContent = "Odstraňujem odkaz...";
+                statusElement.className = "status-message";
+                
                 const youtubeLinkRef = doc(db, "youtubeLinks", `person_${personId}`);
                 deleteDoc(youtubeLinkRef)
                     .then(() => {
                         document.getElementById(`youtubeLinkInput_${personId}`).value = '';
                         document.getElementById(`youtubeLinkDisplay_${personId}`).innerHTML = '';
                         document.getElementById(`removeYouTubeLink_${personId}`).disabled = true;
-                        alert('YouTube odkaz bol odstránený!');
+                        statusElement.textContent = "Odkaz odstránený!";
+                        statusElement.className = "status-message success";
                     })
                     .catch((error) => {
                         console.error('Error removing YouTube link:', error);
-                        alert(`Chyba pri odstraňovaní: ${error.message}`);
+                        statusElement.textContent = "Chyba pri odstraňovaní: " + error.message;
+                        statusElement.className = "status-message error";
                     });
             };
 
@@ -326,7 +361,7 @@
                 const k = 1024;
                 const sizes = ['B', 'KB', 'MB', 'GB'];
                 const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
             }
 
             // Načítanie existujúcich dát pri načítaní stránky
@@ -342,7 +377,9 @@
                         const file = e.target.files[0];
                         if (file) {
                             if (file.size > 50 * 1024 * 1024) { // 50MB limit
-                                alert('Súbor je príliš veľký. Maximálna povolená veľkosť je 50MB.');
+                                const statusElement = document.getElementById(`uploadStatus_${personId}_1`);
+                                statusElement.textContent = "Súbor je príliš veľký (max 50MB)";
+                                statusElement.className = "status-message error";
                                 return;
                             }
                             uploadFile(personId, 1, file);
@@ -372,7 +409,6 @@
                                 const data = docSnap.data();
                                 document.getElementById(`fileUrl_${personId}_1`).innerHTML = `
                                     <a href="${data.url}" target="_blank">${data.fileName || 'Súbor'}</a>
-                                    ${data.timestamp ? `<div><small>Nahraté: ${new Date(data.timestamp).toLocaleString()}</small></div>` : ''}
                                 `;
                                 document.getElementById(`removeFile_${personId}_1`).disabled = false;
                             }
@@ -390,7 +426,6 @@
                                 document.getElementById(`youtubeLinkInput_${personId}`).value = data.link;
                                 document.getElementById(`youtubeLinkDisplay_${personId}`).innerHTML = `
                                     <a href="${data.link}" target="_blank">${data.link}</a>
-                                    ${data.timestamp ? `<div><small>Pridané: ${new Date(data.timestamp).toLocaleString()}</small></div>` : ''}
                                 `;
                                 document.getElementById(`removeYouTubeLink_${personId}`).disabled = false;
                             }
