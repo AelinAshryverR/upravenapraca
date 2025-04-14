@@ -100,30 +100,64 @@
 
         // Function to handle saving YouTube link
         function saveYouTubeLink(personId) {
-            const youtubeLink = document.getElementById(`youtubeLink_${personId}`).value;
-            if (youtubeLink) {
-                setDoc(doc(db, "youtubeLinks", `youtubeLink_${personId}`), { link: youtubeLink })
-                    .then(() => {
-                        alert('YouTube link saved!');
-                    }).catch(error => {
-                        console.error('Error saving YouTube link:', error);
-                    });
-            } else {
-                alert('Please enter a YouTube link');
+            const youtubeLink = document.getElementById(`youtubeLinkInput_${personId}`).value.trim();
+            
+            // Basic validation
+            if (!youtubeLink) {
+                alert('Prosím vložte YouTube odkaz');
+                return;
             }
+            
+            // Convert to embed URL if needed
+            let displayUrl = youtubeLink;
+            if (youtubeLink.includes('youtube.com/watch?v=')) {
+                const videoId = youtubeLink.split('v=')[1].split('&')[0];
+                displayUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            }
+
+            setDoc(doc(db, "youtubeLinks", `person_${personId}`), { 
+                link: youtubeLink,
+                displayUrl: displayUrl,
+                personId: personId
+            }, { merge: true })
+            .then(() => {
+                // Update the display immediately
+                document.getElementById(`youtubeLinkDisplay_${personId}`).innerHTML = 
+                    `<a href="${displayUrl}" target="_blank">${displayUrl}</a>`;
+                alert('YouTube odkaz uložený!');
+            }).catch(error => {
+                console.error('Error saving YouTube link:', error);
+                alert('Chyba pri ukladaní: ' + error.message);
+            });
         }
 
         // Function to remove YouTube link
         function removeYouTubeLink(personId) {
-            const youtubeLinkRef = doc(db, "youtubeLinks", `youtubeLink_${personId}`);
+            const youtubeLinkRef = doc(db, "youtubeLinks", `person_${personId}`);
             deleteDoc(youtubeLinkRef)
                 .then(() => {
-                    document.getElementById(`youtubeLink_${personId}`).value = '';  // Clear input field
-                    alert('YouTube link removed!');
+                    document.getElementById(`youtubeLinkInput_${personId}`).value = '';
+                    document.getElementById(`youtubeLinkDisplay_${personId}`).innerHTML = '';
+                    alert('YouTube odkaz odstránený!');
                 }).catch(error => {
                     console.error('Error removing YouTube link:', error);
-                    alert('Error removing YouTube link');
+                    alert('Chyba pri odstraňovaní: ' + error.message);
                 });
+        }
+
+        // Function to load YouTube links on page load
+        async function loadYouTubeLinks() {
+            for (let i = 1; i <= 21; i++) {
+                const docRef = doc(db, "youtubeLinks", `person_${i}`);
+                const docSnap = await getDoc(docRef);
+                
+                if (docSnap.exists() && docSnap.data().link) {
+                    const linkData = docSnap.data();
+                    document.getElementById(`youtubeLinkInput_${i}`).value = linkData.link;
+                    document.getElementById(`youtubeLinkDisplay_${i}`).innerHTML = 
+                        `<a href="${linkData.displayUrl || linkData.link}" target="_blank">${linkData.displayUrl || linkData.link}</a>`;
+                }
+            }
         }
 
         // Function to populate saved data on page load
@@ -177,16 +211,6 @@
                     saveYouTubeLink(personId);
                 });
 
-                const youtubeLinkRef = doc(db, "youtubeLinks", `youtubeLink_${personId}`);
-                getDoc(youtubeLinkRef).then(docSnapshot => {
-                    if (docSnapshot.exists()) {
-                        const youtubeLink = docSnapshot.data().link;
-                        if (youtubeLink) {
-                            document.getElementById(`youtubeLink_${personId}`).value = youtubeLink;
-                        }
-                    }
-                });
-
                 const removeYoutubeLinkButton = document.getElementById(`removeYouTubeLink_${personId}`);
                 removeYoutubeLinkButton.addEventListener('click', function() {
                     removeYouTubeLink(personId);
@@ -195,6 +219,9 @@
                 // Set the name of the person dynamically
                 document.getElementById(`personName_${personId}`).innerText = personNames[i];
             }
+
+            // Load YouTube links
+            loadYouTubeLinks();
 
             // Apply the blue background to the first row after it is populated
             document.querySelector("tr:nth-child(1)").style.backgroundColor = '#007bff';
@@ -260,7 +287,6 @@
             height: 100px;
             object-fit: contain;
         }
-
         /* New CSS for alternating row colors */
         tr:nth-child(even) {
             background-color: #f2f2f2; /* Gray background for even rows */
@@ -268,12 +294,21 @@
         tr:nth-child(odd) {
             background-color: white; /* White background for odd rows */
         }
+        /* Style for YouTube link display */
+        .youtube-link-display {
+            margin-top: 5px;
+            word-break: break-all;
+        }
+        .youtube-link-display a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .youtube-link-display a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
-
-
-    
     <h1>Tabuľka pre nahrávanie súborov</h1>
 
     <table>
@@ -301,7 +336,8 @@
                                 <button id="removeFile_${i}_1">Odstrániť súbor</button>
                             </td>
                             <td>
-                                <input type="text" id="youtubeLink_${i}" placeholder="Vložte Youtube link">
+                                <input type="text" id="youtubeLinkInput_${i}" placeholder="Vložte YouTube link">
+                                <div class="youtube-link-display" id="youtubeLinkDisplay_${i}"></div>
                                 <button id="saveYouTubeLink_${i}">Uložiť link</button>
                                 <button id="removeYouTubeLink_${i}">Odstrániť link</button>
                             </td>
@@ -316,6 +352,5 @@
         <p>Pre potreby druhé krúžku upravil: Milan Hricko </p>
         <p>Vyučujúci: doc. Ing. Jaroslav Kultan, PhD.</p>
     </footer>
-
 </body>
 </html>
