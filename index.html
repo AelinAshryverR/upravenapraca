@@ -272,19 +272,14 @@
 </head>
 <body>
 
-    <div class="image-container">
-        <img src="obrazky/EUBA LOGO.jpg" alt="Logo EUBA">
-        <img src="obrazky/FHI LOGO.jpg" alt="Logo FHI">
-    </div>
+
     
     <h1>Tabuľka pre nahrávanie súborov</h1>
 
     <table>
         <thead>
             <tr>
-                <th>Meno</th>
-                <th>Technické a programové vybavenie počítača</th>
-                <th>Dobrovoľná práca</th>
+                <th>Meno</th> 
                 <th>Záverečná práca</th>
                 <th>Youtube link</th>
             </tr>
@@ -306,24 +301,6 @@
                                 <button id="removeFile_${i}_1">Odstrániť súbor</button>
                             </td>
                             <td>
-                                <button onclick="document.getElementById('fileInput_${i}_2').click();">Nahrať súbor 2</button>
-                                <input type="file" id="fileInput_${i}_2">
-                                <div class="progress-bar">
-                                    <div class="progress" id="progress_${i}_2"></div>
-                                </div>
-                                <div id="fileUrl_${i}_2"></div>
-                                <button id="removeFile_${i}_2">Odstrániť súbor</button>
-                            </td>
-                            <td>
-                                <button onclick="document.getElementById('fileInput_${i}_3').click();">Nahrať súbor 3</button>
-                                <input type="file" id="fileInput_${i}_3">
-                                <div class="progress-bar">
-                                    <div class="progress" id="progress_${i}_3"></div>
-                                </div>
-                                <div id="fileUrl_${i}_3"></div>
-                                <button id="removeFile_${i}_3">Odstrániť súbor</button>
-                            </td>
-                            <td>
                                 <input type="text" id="youtubeLink_${i}" placeholder="Vložte Youtube link">
                                 <button id="saveYouTubeLink_${i}">Uložiť link</button>
                                 <button id="removeYouTubeLink_${i}">Odstrániť link</button>
@@ -336,6 +313,7 @@
     </table>
     <footer>
         <p>Vytvoril: Lukáš Miščík</p>
+        <p>Pre potreby druhé krúžku upravil: Milan Hricko </p>
         <p>Vyučujúci: doc. Ing. Jaroslav Kultan, PhD.</p>
     </footer>
 
