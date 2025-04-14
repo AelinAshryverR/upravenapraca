@@ -100,16 +100,6 @@
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td id="personName_${i}">Person ${i}</td>
-                <td>
-                    <button onclick="document.getElementById('fileInput_${i}_1').click();">Nahrať súbor 1</button>
-                    <input type="file" id="fileInput_${i}_1">
-                    <div class="progress-bar">
-                        <div class="progress" id="progress_${i}_1"></div>
-                    </div>
-                    <div id="fileUrl_${i}_1"></div>
-                    <button id="removeFile_${i}_1">Odstrániť súbor</button>
-                </td>
-                <td>
                     <input type="text" id="youtubeLinkInput_${i}" placeholder="Vložte YouTube link">
                     <div class="youtube-link-display" id="youtubeLinkDisplay_${i}"></div>
                     <button id="saveYouTubeLink_${i}">Uložiť link</button>
