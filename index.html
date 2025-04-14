@@ -79,7 +79,7 @@
     <!-- Skript na vygenerovanie tabuľky -->
     <script>
         const tbody = document.getElementById('tableBody');
-        for (let i = 1; i <= 21; i++) {
+        for (let i = 1; i <= 25; i++) {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td id="personName_${i}">Person ${i}</td>
@@ -166,9 +166,12 @@
 
         window.onload = () => {
             const personNames = [
-                "Ako natočiť video?", "Ako nahrať video na youtube?", "Bielková N.", "Hanáková K.", "Evelyn N.", "Hanzelová P.", "Hanková L.",
-                "Gdúlová J.", "Dobiašová A.", "Frajkorová S. "Fritschová T.", "Gajdoš M..", "Guttenová T.", "Hrebíček M",
-                "Hricko M.", "Hričovská M.", "Hrnčiar M.", "Hvizdošová E.", "Chlpíková D.", "Chudá M.", "Ihnátová T.", "Ilková K.", "Ivšaková K.", "Janovcová N."  
+         const personNames = [
+    "Ako natočiť video?", "Ako nahrať video na youtube?", "Bielková N.", "Hanáková K.", "Evelyn N.", "Hanzelová P.", "Hanková L.",
+    "Gdúlová J.", "Dobiašová A.", "Frajkorová S.", "Fritschová T.", "Gajdoš M.", "Guttenová T.", "Hrebíček M",
+    "Hricko M.", "Hričovská M.", "Hrnčiar M.", "Hvizdošová E.", "Chlpíková D.", "Chudá M.", "Ihnátová T.", "Ilková K.", "Ivšaková K.", "Janovcová N."
+];
+   
             ];
 
             for (let i = 1; i <= 21; i++) {
